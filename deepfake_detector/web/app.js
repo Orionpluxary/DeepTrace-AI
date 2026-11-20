@@ -56,8 +56,79 @@ document.addEventListener('DOMContentLoaded', () => {
     const badgeBoundary = document.getElementById('badge-boundary');
     const barBoundary = document.getElementById('bar-boundary');
 
+    const valDctDiscrepancy = document.getElementById('val-dct-discrepancy');
+    const badgeDct = document.getElementById('badge-dct');
+    const barDct = document.getElementById('bar-dct');
+
     const findingsList = document.getElementById('findings-list');
     const exportJsonBtn = document.getElementById('export-json-btn');
+
+    // AI Vision Results Elements (shown in findings if analysis is present)
+    const aiResultsCard = document.getElementById('ai-results-card');
+    const aiModelLabel = document.getElementById('ai-model-label');
+    const aiVerdictTag = document.getElementById('ai-verdict-tag');
+    const aiAuditContent = document.getElementById('ai-audit-content');
+
+    // AI Provider & Key Settings UI Elements
+    const uiLlmProvider = document.getElementById('ui-llm-provider');
+    const uiApiKeyContainer = document.getElementById('ui-api-key-container');
+    const uiLlmKey = document.getElementById('ui-llm-key');
+    const aiActiveIndicator = document.getElementById('ai-active-indicator');
+    const uiKeyHint = document.getElementById('ui-key-hint');
+
+    if (uiLlmProvider) {
+        uiLlmProvider.addEventListener('change', () => {
+            const val = uiLlmProvider.value;
+            if (val === 'offline') {
+                if (uiApiKeyContainer) uiApiKeyContainer.style.display = 'none';
+                if (aiActiveIndicator) {
+                    aiActiveIndicator.textContent = 'Disabled';
+                    aiActiveIndicator.style.color = '#94a3b8';
+                    aiActiveIndicator.style.background = 'rgba(148, 163, 184, 0.15)';
+                }
+            } else if (val === 'nvidia') {
+                if (uiApiKeyContainer) uiApiKeyContainer.style.display = 'none';
+                if (aiActiveIndicator) {
+                    aiActiveIndicator.textContent = 'NVIDIA Active';
+                    aiActiveIndicator.style.color = '#10b981';
+                    aiActiveIndicator.style.background = 'rgba(16, 185, 129, 0.15)';
+                }
+            } else {
+                if (uiApiKeyContainer) uiApiKeyContainer.style.display = 'block';
+                if (aiActiveIndicator) {
+                    aiActiveIndicator.textContent = val.toUpperCase() + ' Mode';
+                    aiActiveIndicator.style.color = '#38bdf8';
+                    aiActiveIndicator.style.background = 'rgba(56, 189, 248, 0.15)';
+                }
+                if (val === 'gemini') {
+                    if (uiLlmKey) uiLlmKey.placeholder = 'Enter Google Gemini API Key (from Google AI Studio)';
+                    if (uiKeyHint) uiKeyHint.textContent = 'Free at aistudio.google.com — or leave blank if in .env';
+                } else if (val === 'openai') {
+                    if (uiLlmKey) uiLlmKey.placeholder = 'Enter OpenAI API Key (sk-...)';
+                    if (uiKeyHint) uiKeyHint.textContent = 'Leave blank to use OPENAI_API_KEY from .env';
+                }
+            }
+        });
+    }
+
+    // Check API Health and Detector Status
+    const seStatusBadge = document.getElementById('sightengine-status-badge');
+    fetch('/api/health')
+        .then(res => res.json())
+        .then(data => {
+            if (seStatusBadge) {
+                if (data.sightengine_active) {
+                    seStatusBadge.textContent = 'Active (.env Loaded)';
+                    seStatusBadge.style.color = '#10b981';
+                    seStatusBadge.style.background = 'rgba(16, 185, 129, 0.15)';
+                } else {
+                    seStatusBadge.textContent = 'Fallback Mode (Smaug / Forensics)';
+                    seStatusBadge.style.color = '#38bdf8';
+                    seStatusBadge.style.background = 'rgba(56, 189, 248, 0.15)';
+                }
+            }
+        })
+        .catch(err => console.warn('Health check error:', err));
 
     // App State
     let currentFile = null;
@@ -68,7 +139,8 @@ document.addEventListener('DOMContentLoaded', () => {
         'ela_map': '<strong>Error Level Analysis (ELA):</strong> Multi-colored thermal map. High-intensity areas (red/white) show spliced or altered regions with differing compression.',
         'noise_map': '<strong>Sensor Noise (PRNU):</strong> Camera sensor grain. Smooth patches on a noisy image indicate synthetic smoothing or AI regeneration.',
         'fft_map': '<strong>2D FFT Spectrum:</strong> Frequency domain representation. Star/grid spikes away from center reveal synthetic upsampling artifacts.',
-        'boundary_map': '<strong>Boundary Seam:</strong> Edge gradients along facial contours. Highlights blending seams from face swap feathering.'
+        'boundary_map': '<strong>Boundary Seam:</strong> Edge gradients along facial contours. Highlights blending seams from face swap feathering.',
+        'dct_map': '<strong>JPEG Block Grid (DCT):</strong> 8x8 compression blocking. Detects grid displacement or misalignment caused by splicing face swaps into host images.'
     };
 
     // --------------------------------------------------------------------------
@@ -160,6 +232,23 @@ document.addEventListener('DOMContentLoaded', () => {
         const formData = new FormData();
         formData.append('image', currentFile);
 
+        // Sightengine credentials override from UI
+        const seUser = document.getElementById('ui-sightengine-user');
+        const seSecret = document.getElementById('ui-sightengine-secret');
+        if (seUser && seUser.value.trim()) {
+            formData.append('sightengine_user', seUser.value.trim());
+        }
+        if (seSecret && seSecret.value.trim()) {
+            formData.append('sightengine_secret', seSecret.value.trim());
+        }
+
+        if (uiLlmProvider && uiLlmProvider.value !== 'offline') {
+            formData.append('llm_provider', uiLlmProvider.value);
+            if (uiLlmKey && uiLlmKey.value.trim()) {
+                formData.append('llm_key', uiLlmKey.value.trim());
+            }
+        }
+
         try {
             const response = await fetch('/api/analyze', {
                 method: 'POST',
@@ -193,11 +282,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function simulateProgressStages() {
         const stages = [
-            { pct: 20, text: 'Detecting Facial Geometry & Landmarks...', tag: 'stage-face' },
-            { pct: 45, text: 'Computing Error Level Analysis (ELA)...', tag: 'stage-ela' },
-            { pct: 65, text: 'Extracting Sensor PRNU Noise Residual...', tag: 'stage-noise' },
-            { pct: 85, text: '2D FFT Spectral Grid Decomposition...', tag: 'stage-fft' },
-            { pct: 95, text: 'Scanning Blending Boundary Seam Gradients...', tag: 'stage-seam' }
+            { pct: 20, text: 'Connecting to Sightengine AI Detection API...', tag: 'stage-ai' },
+            { pct: 50, text: 'Querying models: genai, deepfake...', tag: 'stage-ai' },
+            { pct: 75, text: 'Generating diagnostic visual maps (ELA, Noise, FFT)...', tag: 'stage-ela' },
+            { pct: 95, text: 'Finalizing 3-Tier Sightengine verdict...', tag: 'stage-seam' }
         ];
 
         stages.forEach((stage, idx) => {
@@ -236,28 +324,28 @@ document.addEventListener('DOMContentLoaded', () => {
         const offset = circumference - (authScore / 100) * circumference;
         gaugeProgress.style.strokeDashoffset = offset;
 
-        // Color gauge based on verdict
-        let strokeColor = '#10b981'; // genuine
+        // Color gauge and header based on 3-tier verdict
+        let strokeColor = '#10b981'; // genuine (<= 0.30)
         verdictBadge.className = 'verdict-badge';
 
         if (summary.verdict_code === 'deepfake') {
-            strokeColor = '#f43f5e';
+            strokeColor = '#f43f5e'; // Red
             verdictBadge.classList.add('badge-deepfake');
-            verdictBadge.textContent = 'HIGH PROBABILITY DEEPFAKE';
-            verdictTitle.textContent = 'Synthetic or Swapped Content Detected';
-            verdictDesc.textContent = 'Inconsistent compression artifacts, unnatural sensor noise distribution, and boundary gradient mismatches were observed.';
+            verdictBadge.textContent = 'LIKELY AI-GENERATED / MANIPULATED';
+            verdictTitle.textContent = 'Likely AI-Generated / Manipulated';
+            verdictDesc.textContent = 'High probability (>= 70%) of generative AI synthesis, face swapping, or digital manipulation detected.';
         } else if (summary.verdict_code === 'suspicious') {
-            strokeColor = '#f59e0b';
+            strokeColor = '#f59e0b'; // Amber
             verdictBadge.classList.add('badge-suspicious');
-            verdictBadge.textContent = 'SUSPICIOUS / INCONCLUSIVE';
-            verdictTitle.textContent = 'Potential Manipulation Indicators';
-            verdictDesc.textContent = 'Mild discrepancies found in spectral frequency or noise variance. Recommend human forensic cross-check.';
+            verdictBadge.textContent = 'INCONCLUSIVE / COMPRESSED SIGNAL';
+            verdictTitle.textContent = 'Inconclusive / Compressed Signal';
+            verdictDesc.textContent = 'Intermediate signal range (31% - 69%). Heavy compression or ambiguous forensic cues detected. Manual review recommended.';
         } else {
-            strokeColor = '#10b981';
+            strokeColor = '#10b981'; // Green
             verdictBadge.classList.add('badge-genuine');
-            verdictBadge.textContent = 'LIKELY GENUINE';
-            verdictTitle.textContent = 'Authentic Photo Verified';
-            verdictDesc.textContent = 'Uniform compression error levels, consistent camera sensor noise, and natural spectral power falloff.';
+            verdictBadge.textContent = 'LIKELY AUTHENTIC';
+            verdictTitle.textContent = 'Likely Authentic Photo';
+            verdictDesc.textContent = 'Low manipulation risk (<= 30%). Uniform sensor noise grain, authentic facial anatomy, and consistent compression.';
         }
         gaugeProgress.style.stroke = strokeColor;
         confidenceBadge.textContent = `${summary.confidence} Confidence`;
@@ -290,6 +378,12 @@ document.addEventListener('DOMContentLoaded', () => {
         valBoundaryStep.textContent = metrics.boundary.seam_gradient_step;
         updateRiskBadge(badgeBoundary, barBoundary, metrics.boundary.risk_level, metrics.boundary.seam_gradient_step, 0.45);
 
+        // JPEG Block Grid (DCT)
+        if (metrics.dct && valDctDiscrepancy) {
+            valDctDiscrepancy.textContent = metrics.dct.grid_discrepancy;
+            updateRiskBadge(badgeDct, barDct, metrics.dct.risk_level, metrics.dct.grid_discrepancy, 0.40);
+        }
+
         // 4. Evidence Findings List
         findingsList.innerHTML = '';
         indicators.forEach(item => {
@@ -297,6 +391,83 @@ document.addEventListener('DOMContentLoaded', () => {
             li.textContent = item;
             findingsList.appendChild(li);
         });
+
+        // 4b. Render Sightengine Card if active
+        const seCard = document.getElementById('sightengine-results-card');
+        const seScoreBadge = document.getElementById('sightengine-score-badge');
+        const seGenaiVal = document.getElementById('se-genai-val');
+        const seDeepfakeVal = document.getElementById('se-deepfake-val');
+        const seCombinedVal = document.getElementById('se-combined-val');
+        const seTitle = document.getElementById('sightengine-verdict-title');
+
+        if (data.sightengine && data.sightengine.status === 'success' && seCard) {
+            seCard.style.display = 'block';
+            const se = data.sightengine;
+            const genaiPct = Math.round((se.ai_generated_score || 0.0) * 100);
+            const dfPct = Math.round((se.deepfake_score || 0.0) * 100);
+            const combPct = Math.round((se.combined_score || 0.0) * 100);
+
+            if (seGenaiVal) seGenaiVal.textContent = `${genaiPct}%`;
+            if (seDeepfakeVal) seDeepfakeVal.textContent = `${dfPct}%`;
+            if (seCombinedVal) seCombinedVal.textContent = `${combPct}%`;
+
+            if (seScoreBadge) {
+                seScoreBadge.className = 'verdict-tag';
+                if (combPct >= 70) {
+                    seScoreBadge.classList.add('tag-deepfake');
+                    seScoreBadge.textContent = `${combPct}% Manipulated`;
+                } else if (combPct >= 31) {
+                    seScoreBadge.classList.add('tag-suspicious');
+                    seScoreBadge.textContent = `${combPct}% Inconclusive`;
+                } else {
+                    seScoreBadge.classList.add('tag-genuine');
+                    seScoreBadge.textContent = `${combPct}% Authentic`;
+                }
+            }
+        } else if (seCard) {
+            seCard.style.display = 'none';
+        }
+
+        // 5. Render AI Vision Audit Card if available
+        if (data.llm_audit && data.llm_audit.status === 'success' && aiResultsCard) {
+            aiResultsCard.style.display = 'flex';
+            const llm = data.llm_audit;
+            if (aiModelLabel) {
+                aiModelLabel.textContent = `${llm.provider} (${llm.model}) Semantic Audit`;
+            }
+            if (aiVerdictTag) {
+                aiVerdictTag.className = 'verdict-tag';
+                if (llm.verdict_code === 'deepfake') {
+                    aiVerdictTag.classList.add('tag-deepfake');
+                    aiVerdictTag.textContent = 'AI Generated / Deepfake';
+                } else if (llm.verdict_code === 'suspicious') {
+                    aiVerdictTag.classList.add('tag-suspicious');
+                    aiVerdictTag.textContent = 'Suspicious / Inconclusive';
+                } else {
+                    aiVerdictTag.classList.add('tag-genuine');
+                    aiVerdictTag.textContent = 'No Confirmed Manipulation';
+                }
+            }
+
+            if (aiAuditContent) {
+                aiAuditContent.innerHTML = '';
+                (llm.primary_findings || []).forEach(pt => {
+                    const div = document.createElement('div');
+                    div.className = 'ai-audit-point';
+                    div.textContent = pt;
+                    aiAuditContent.appendChild(div);
+                });
+
+                if (llm.mobile_processing_notes) {
+                    const noteBox = document.createElement('div');
+                    noteBox.className = 'ai-note-box';
+                    noteBox.innerHTML = `<strong>Mobile Camera / Filter Notes:</strong> ${llm.mobile_processing_notes}`;
+                    aiAuditContent.appendChild(noteBox);
+                }
+            }
+        } else if (aiResultsCard) {
+            aiResultsCard.style.display = 'none';
+        }
 
         // Scroll smoothly to results
         resultsView.scrollIntoView({ behavior: 'smooth', block: 'nearest' });

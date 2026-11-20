@@ -79,6 +79,23 @@
                     </div>
                 </div>
 
+                <!-- Sightengine API Settings (Exclusive Detection Engine) -->
+                <div class="ai-config-box" style="margin-top: 16px; margin-bottom: 8px; padding: 12px 14px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-subtle); border-radius: var(--radius-md);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <label style="font-size: 0.85rem; font-weight: 600; color: var(--accent-cyan); display: flex; align-items: center; gap: 6px;">
+                            <span>🛡️</span> Sightengine API Detection (Primary)
+                        </label>
+                        <span id="sightengine-status-badge" style="font-size: 0.72rem; color: #10b981; background: rgba(16, 185, 129, 0.15); padding: 2px 8px; border-radius: 9999px;">.env Active</span>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 4px;">
+                        <input type="text" id="ui-sightengine-user" placeholder="Sightengine API User (optional, overrides .env)" style="width: 100%; padding: 7px 10px; background: rgba(15, 23, 42, 0.9); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 0.80rem; font-family: var(--font-mono);">
+                        <input type="password" id="ui-sightengine-secret" placeholder="Sightengine API Secret (optional, overrides .env)" style="width: 100%; padding: 7px 10px; background: rgba(15, 23, 42, 0.9); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 0.80rem; font-family: var(--font-mono);">
+                    </div>
+                    <small style="color: var(--text-muted); font-size: 0.72rem; display: block;">
+                        API Models: <code>genai,deepfake</code>. Sole authoritative detection engine.
+                    </small>
+                </div>
+
                 <!-- Action Buttons -->
                 <div class="action-bar">
                     <button id="scan-btn" class="btn-primary" disabled>
@@ -107,8 +124,11 @@
                         <span class="stage-tag" id="stage-noise">3. Noise Residual</span>
                         <span class="stage-tag" id="stage-fft">4. 2D FFT</span>
                         <span class="stage-tag" id="stage-seam">5. Seam Scan</span>
+                        <span class="stage-tag" id="stage-ai">6. AI Vision</span>
                     </div>
                 </div>
+
+
 
                 <!-- Explanation Tips -->
                 <div class="info-callout">
@@ -176,6 +196,7 @@
                                 <button type="button" class="tab-btn" data-map="noise_map" id="tab-noise">Noise (PRNU)</button>
                                 <button type="button" class="tab-btn" data-map="fft_map" id="tab-fft">2D FFT</button>
                                 <button type="button" class="tab-btn" data-map="boundary_map" id="tab-seam">Seam Map</button>
+                                <button type="button" class="tab-btn" data-map="dct_map" id="tab-dct">JPEG Grid (DCT)</button>
                             </div>
                         </div>
 
@@ -252,12 +273,28 @@
                             </div>
                             <p class="metric-desc">Checks for Poisson/alpha boundary feathering.</p>
                         </div>
+
+                        <!-- Metric 5: JPEG Block Grid (DCT) -->
+                        <div class="metric-card">
+                            <div class="metric-header">
+                                <span class="metric-title">JPEG Grid (DCT)</span>
+                                <span id="badge-dct" class="risk-badge risk-low">Low Risk</span>
+                            </div>
+                            <div class="metric-value-row">
+                                <span id="val-dct-discrepancy" class="metric-number">0.03</span>
+                                <span class="metric-unit">Grid Offset</span>
+                            </div>
+                            <div class="metric-bar-track">
+                                <div id="bar-dct" class="metric-bar-fill fill-low" style="width: 7%;"></div>
+                            </div>
+                            <p class="metric-desc">8x8 pixel block alignment and boundary discontinuity.</p>
+                        </div>
                     </div>
 
                     <!-- Forensic Findings & Metadata -->
                     <div class="findings-card">
                         <div class="findings-header">
-                            <h3 class="subheading">Forensic Evidence & Findings</h3>
+                            <h3 class="subheading">Physical Forensic Evidence & Findings</h3>
                             <button type="button" id="export-json-btn" class="btn-outline-sm">
                                 <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none">
                                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -270,6 +307,45 @@
                         <ul id="findings-list" class="findings-list">
                             <!-- Populated dynamically -->
                         </ul>
+                    </div>
+
+                    <!-- Sightengine AI & Deepfake Card (Shown if active) -->
+                    <div id="sightengine-results-card" class="findings-card" style="display: none; border-left: 3px solid var(--accent-cyan);">
+                        <div class="findings-header">
+                            <div class="ai-results-title-group">
+                                <span class="card-badge" style="color: var(--accent-cyan); border-color: rgba(0, 240, 255, 0.3);">Sightengine Detection</span>
+                                <h3 class="subheading" id="sightengine-verdict-title">AI & Deepfake Analysis</h3>
+                            </div>
+                            <span id="sightengine-score-badge" class="verdict-tag tag-genuine">0.0% AI</span>
+                        </div>
+                        <div id="sightengine-metrics-row" style="display: flex; gap: 12px; margin-top: 10px; flex-wrap: wrap;">
+                            <div class="metric-pill" style="background: rgba(255,255,255,0.04); padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); flex: 1; min-width: 140px;">
+                                <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Type (GenAI)</div>
+                                <div id="se-genai-val" style="font-size: 1.1rem; font-weight: 700; font-family: var(--font-mono); color: var(--text-primary);">0.0%</div>
+                            </div>
+                            <div class="metric-pill" style="background: rgba(255,255,255,0.04); padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); flex: 1; min-width: 140px;">
+                                <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Faces (Deepfake)</div>
+                                <div id="se-deepfake-val" style="font-size: 1.1rem; font-weight: 700; font-family: var(--font-mono); color: var(--text-primary);">0.0%</div>
+                            </div>
+                            <div class="metric-pill" style="background: rgba(255,255,255,0.04); padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); flex: 1; min-width: 140px;">
+                                <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Sightengine Combined</div>
+                                <div id="se-combined-val" style="font-size: 1.1rem; font-weight: 700; font-family: var(--font-mono); color: var(--accent-cyan);">0.0%</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- AI Semantic Vision Audit Card (Shown if active) -->
+                    <div id="ai-results-card" class="findings-card ai-results-card" style="display: none;">
+                        <div class="findings-header">
+                            <div class="ai-results-title-group">
+                                <span class="ai-badge">AI Vision Audit</span>
+                                <h3 class="subheading" id="ai-model-label">Gemini 2.5 Flash Semantic Analysis</h3>
+                            </div>
+                            <span id="ai-verdict-tag" class="verdict-tag tag-genuine">Authentic</span>
+                        </div>
+                        <div id="ai-audit-content" class="ai-audit-content">
+                            <!-- Populated dynamically -->
+                        </div>
                     </div>
                 </div>
             </section>

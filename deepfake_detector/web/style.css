@@ -905,3 +905,241 @@ body {
     font-size: 1.2rem;
     line-height: 1;
 }
+
+/* ==========================================================================
+   AI Multimodal Assistant Configuration & Results
+   ========================================================================== */
+.ai-config-card {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(56, 189, 248, 0.25);
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    transition: border-color 0.3s ease;
+}
+
+.ai-config-card:hover {
+    border-color: rgba(56, 189, 248, 0.45);
+}
+
+.ai-config-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+}
+
+.ai-title-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ai-badge {
+    background: linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(129, 140, 248, 0.25));
+    border: 1px solid rgba(56, 189, 248, 0.4);
+    color: #38bdf8;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 2px 7px;
+    border-radius: 99px;
+}
+
+.ai-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.ai-help-text {
+    font-size: 0.74rem;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+.ai-config-body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.input-group label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.form-select, .form-input {
+    background: rgba(15, 23, 42, 0.8);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    padding: 7px 10px;
+    font-size: 0.82rem;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s ease;
+}
+
+.form-select:focus, .form-input:focus {
+    border-color: var(--accent-cyan);
+}
+
+.password-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.password-wrapper .form-input {
+    width: 100%;
+    padding-right: 32px;
+}
+
+.btn-eye {
+    position: absolute;
+    right: 8px;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 0.85rem;
+    padding: 2px;
+}
+
+.btn-eye:hover {
+    color: var(--text-primary);
+}
+
+.key-hint {
+    font-size: 0.67rem;
+    color: var(--text-muted);
+}
+
+/* Switch styling */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 36px;
+    height: 20px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background-color: rgba(255, 255, 255, 0.15);
+    transition: .3s;
+    border-radius: 20px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 14px;
+    width: 14px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: .3s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: var(--accent-cyan);
+}
+
+input:checked + .slider:before {
+    transform: translateX(16px);
+}
+
+/* AI Results Card */
+.ai-results-card {
+    border-color: rgba(56, 189, 248, 0.35);
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.9) 0%, rgba(20, 30, 50, 0.75) 100%);
+}
+
+.ai-results-title-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.verdict-tag {
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 99px;
+    text-transform: uppercase;
+}
+
+.tag-genuine {
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--status-genuine);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.tag-suspicious {
+    background: rgba(245, 158, 11, 0.15);
+    color: var(--status-suspicious);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.tag-deepfake {
+    background: rgba(244, 63, 94, 0.15);
+    color: var(--status-fake);
+    border: 1px solid rgba(244, 63, 94, 0.3);
+}
+
+.ai-audit-content {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.ai-audit-point {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    line-height: 1.45;
+}
+
+.ai-audit-point::before {
+    content: "✦";
+    color: #38bdf8;
+    font-size: 0.9rem;
+    line-height: 1.2;
+}
+
+.ai-note-box {
+    margin-top: 6px;
+    padding: 8px 12px;
+    background: rgba(56, 189, 248, 0.08);
+    border-left: 3px solid #38bdf8;
+    border-radius: 4px;
+    font-size: 0.76rem;
+    color: var(--text-secondary);
+}
+

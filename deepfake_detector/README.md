@@ -241,23 +241,35 @@ $$\text{Step}_{\text{seam}} = \frac{|G_{\text{in}} - G_{\text{border}}|}{G_{\tex
 
 ### Pillar 6: Cryptographic Provenance & Generative Metadata Audit
 
-* **Hardware Tags:** Parses EXIF tags (`Make`, `Model`, `LensInfo`, `DateTimeOriginal`). Verifiable camera sensor models (e.g., Sony $\alpha7$, Canon EOS, Apple iPhone) grant authenticity credits.
+* **Hardware Tags:** Parses EXIF tags (`Make`, `Model`, `LensInfo`, `DateTimeOriginal`). Verifiable camera sensor models grant authenticity credits.
 * **Generative Signatures:** Scans EXIF UserComment, Software, and PNG chunks for signatures from tools like:
   * `Midjourney`, `Stable Diffusion`, `ComfyUI`, `DALL-E`, `FLUX`, `Firefly`, `FaceFusion`, `Roop`.
 * **Prompt & Workflow Metadata:** Analyzes text streams for diffusion parameters: `sampler:`, `steps:`, `cfg_scale`, `model_hash`, `sd_model`.
+* **Social Media & Low-Res Adaptation:** Automatically detects compressed / social media web uploads (e.g., WhatsApp, Telegram) without falsely penalizing stripped metadata.
+
+---
+
+### Pillar 7: Multimodal LLM Semantic Vision Audit (Optional)
+
+DeepTrace AI incorporates an optional neuro-symbolic verification layer powered by Google Gemini (`gemini-2.5-flash`) or OpenAI (`gpt-4o-mini`):
+* **Optical Refraction Physics:** Checks whether glasses lenses realistically refract the face contour / cheekline and ambient background.
+* **Micro-Anatomy & Symmetry:** Analyzes ear cartilage, earrings, nose pins, bindi, lips, and teeth for physical coherence.
+* **Mobile Post-Processing Disambiguation:** Distinguishes between normal smartphone selfie beauty smoothing / portrait mode bokeh and generative diffusion or face-swap artifacts.
+* **Execution Modes:** Runs seamlessly via CLI (`--llm-key`), Web UI settings, or environment variables (`GEMINI_API_KEY`, `OPENAI_API_KEY`). When absent, DeepTrace relies 100% on calibrated physical signal processing.
 
 ---
 
 ## Part 3: Unified Multi-Factor Ensemble Scoring Formula
 
-The final **Manipulation Probability ($P_{\text{manip}}$)** and **Authenticity Score ($S_{\text{auth}}$)** are computed using a weighted ensemble function:
+The final **Manipulation Probability ($P_{\text{manip}}$)** and **Authenticity Score ($S_{\text{auth}}$)** are computed using a calibrated ensemble function:
 
-| Forensic Factor | Maximum Weight | Condition for Maximum Weight | Condition for Moderate Weight |
+| Forensic Factor | Maximum Weight | Condition for Maximum Weight | Calibration & Invariance |
 | :--- | :--- | :--- | :--- |
-| **Error Level Analysis (ELA)** | **30%** | $R_{\text{ela}} > 0.45$ | $R_{\text{ela}} > 0.22$ (+15%) |
-| **Sensor Noise (PRNU Proxy)** | **25%** | $R_{\text{noise}} > 0.40$ | $R_{\text{noise}} > 0.20$ (+12%) |
-| **2D Spectral FFT Anomaly** | **20%** | $S_{\text{grid}} > 0.45$ | $S_{\text{grid}} > 0.20$ (+10%) |
-| **Boundary Seam Step** | **15%** | $\text{Step}_{\text{seam}} > 0.45$ | $\text{Step}_{\text{seam}} > 0.20$ (+8%) |
+| **Error Level Analysis (ELA)** | **30%** | $R_{\text{ela}} > 0.45$ & $\Delta E > 3.5$ | Gated by absolute pixel error to avoid division blowup on low-energy images. |
+| **Sensor Noise (PRNU Proxy)** | **25%** | $R_{\text{noise}} > 0.50$ | Calibrated for optical depth-of-field (bokeh) so blurred backgrounds do not cause false positives. |
+| **2D Spectral FFT Anomaly** | **20%** | $S_{\text{grid}} > 0.45$ | 2D lattice outlier test isolating periodic GAN/diffusion upsampler checkerboards. |
+| **Boundary Seam Step** | **15%** | $\text{Step}_{\text{seam}} > 0.45$ & $\Delta G > 5.0$ | Edge-gradient differential along facial perimeter checking for Poisson/alpha feathering. |
+| **LLM Vision Semantic Audit** | **Optional (45% blend)** | $P_{\text{llm}} > 60\%$ | Deep multimodal visual audit examining physical refraction, micro-anatomy, and filter type. |
 | **Metadata Audit** | **10%** | $+25\%$ if AI signature detected | $-15\%$ if verified camera hardware tags exist |
 
 ### Decision Boundary Logic

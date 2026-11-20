@@ -10,6 +10,16 @@ parent_dir = os.path.dirname(current_dir)
 if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
+try:
+    from dotenv import load_dotenv
+    env_path = os.path.join(parent_dir, '.env')
+    if os.path.exists(env_path):
+        load_dotenv(dotenv_path=env_path, override=True)
+    else:
+        load_dotenv()
+except Exception:
+    pass
+
 from deepfake_detector.core.forensics import DeepfakeDetector
 from deepfake_detector.server import run_server
 
@@ -21,6 +31,12 @@ def main():
     parser.add_argument('--json', '-j', action='store_true', help="Output raw JSON results")
     parser.add_argument('--serve', action='store_true', help="Start the interactive Web UI server")
     parser.add_argument('--port', type=int, default=7860, help="Web server port (default: 7860)")
+
+    parser.add_argument('--llm-key', type=str, default=None, help="API key for optional multimodal LLM Vision verification")
+    parser.add_argument('--llm-provider', type=str, default='gemini', choices=['gemini', 'openai', 'nvidia'], help="LLM Provider: 'gemini', 'openai', or 'nvidia' (default: gemini)")
+    parser.add_argument('--llm-model', type=str, default=None, help="LLM Vision model (e.g., gemini-2.0-flash, gpt-4o-mini, or nvidia/nemotron-3.5-super-vl-120b-a12b)")
+    parser.add_argument('--sightengine-user', type=str, default=None, help="Sightengine API User (optional, overrides SIGHTENGINE_API_USER)")
+    parser.add_argument('--sightengine-secret', type=str, default=None, help="Sightengine API Secret (optional, overrides SIGHTENGINE_API_SECRET)")
 
     args = parser.parse_args()
 
@@ -40,7 +56,14 @@ def main():
 
     print(f"\n[*] Scanning: {image_path}")
     detector = DeepfakeDetector()
-    results = detector.analyze_image(image_path)
+    results = detector.analyze_image(
+        image_path=image_path,
+        llm_api_key=args.llm_key,
+        llm_provider=args.llm_provider,
+        llm_model=args.llm_model,
+        sightengine_user=args.sightengine_user,
+        sightengine_secret=args.sightengine_secret
+    )
 
     if args.json:
         # Don't clutter terminal with base64 maps
@@ -69,13 +92,45 @@ def main():
     m = results['metrics']
     print(f"  • ELA Discrepancy:     {m['ela']['discrepancy_ratio']} [{m['ela']['risk_level']} Risk]")
     print(f"  • Sensor Noise Ratio:  {m['noise']['noise_variance_ratio']} [{m['noise']['risk_level']} Risk]")
+    if m['noise'].get('is_bokeh'):
+        print(f"    (Optical Bokeh / Depth-of-Field Verified: Subject Sharp, Background Soft)")
     print(f"  • Spectral FFT Grid:   {m['frequency']['spectral_grid_anomaly']} [{m['frequency']['risk_level']} Risk]")
     print(f"  • Seam Boundary Step:  {m['boundary']['seam_gradient_step']} [{m['boundary']['risk_level']} Risk]")
+    if 'dct' in m:
+        print(f"  • JPEG DCT 8x8 Grid:   {m['dct']['grid_discrepancy']} [{m['dct']['risk_level']} Risk]")
+    
+    # Sightengine results if present
+    se = results.get('sightengine', {})
+    if se and se.get('status') == 'success':
+        print("-" * 60)
+        print(" SIGHTENGINE AI & DEEPFAKE DETECTION:")
+        print(f"  • AI Generated Score:  {se.get('ai_generated_score', 0.0)*100:.1f}%")
+        print(f"  • Face Deepfake Score: {se.get('deepfake_score', 0.0)*100:.1f}%")
+        print(f"  • Combined AI Score:   {se.get('combined_score', 0.0)*100:.1f}%")
+
+    # Smaug fallback results if present
+    smaug = results.get('smaug', {})
+    if smaug and smaug.get('status') == 'success':
+        print("-" * 60)
+        print(" SMAUG LOCAL AI DETECTOR (FALLBACK):")
+        print(f"  • AI Probability:      {smaug.get('score', 0.0)*100:.1f}%")
+
+    # LLM Audit results if present
+    llm = results.get('llm_audit', {})
+    if llm and llm.get('status') == 'success':
+        print("-" * 60)
+        print(f" AI MULTIMODAL VISION AUDIT ({llm.get('provider')} / {llm.get('model')}):")
+        print(f"  • LLM Verdict:         {llm.get('verdict')}")
+        print(f"  • LLM Authenticity:    {llm.get('authenticity_score')}%")
+        if llm.get('mobile_processing_notes'):
+            print(f"  • Mobile Processing:   {llm.get('mobile_processing_notes')}")
+
     print("-" * 60)
     print(" KEY EVIDENCE & FINDINGS:")
     for ind in results['indicators']:
         print(f"  [+] {ind}")
     print("=" * 60)
+
 
     # Save visual maps if requested
     if args.save_maps:

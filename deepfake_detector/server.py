@@ -12,6 +12,16 @@ parent_dir = os.path.dirname(current_dir)
 if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
+try:
+    from dotenv import load_dotenv
+    env_path = os.path.join(parent_dir, '.env')
+    if os.path.exists(env_path):
+        load_dotenv(dotenv_path=env_path, override=True)
+    else:
+        load_dotenv()
+except Exception:
+    pass
+
 from deepfake_detector.core.forensics import DeepfakeDetector
 
 WEB_DIR = os.path.join(current_dir, 'web')
@@ -24,7 +34,15 @@ class ForensicHTTPHandler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == '/api/health':
-            self._send_json({'status': 'ok', 'engine': 'DeepTrace AI v2.4.0'})
+            se_user = os.environ.get('SIGHTENGINE_API_USER')
+            se_secret = os.environ.get('SIGHTENGINE_API_SECRET')
+            has_se = bool(se_user and se_secret and se_user.strip() and se_secret.strip())
+            self._send_json({
+                'status': 'ok',
+                'engine': 'DeepTrace AI v2.4.0',
+                'sightengine_active': has_se,
+                'primary_detector': 'Sightengine (genai,deepfake)' if has_se else 'Smaug / Forensic Ensemble'
+            })
             return
         # Default static file routing
         return super().do_GET()
@@ -45,14 +63,39 @@ class ForensicHTTPHandler(SimpleHTTPRequestHandler):
 
                 image_bytes = None
                 filename = "upload.jpg"
+                llm_key = self.headers.get('X-LLM-Key', None)
+                llm_provider = self.headers.get('X-LLM-Provider', None)
+                llm_model = self.headers.get('X-LLM-Model', None)
+                sightengine_user = self.headers.get('X-Sightengine-User', None)
+                sightengine_secret = self.headers.get('X-Sightengine-Secret', None)
 
                 for part in msg.iter_parts():
                     cd = part.get('Content-Disposition', '')
-                    if 'name="image"' in cd or part.get_filename():
+                    name = part.get_param('name', header='content-disposition')
+                    if name == 'image' or part.get_filename():
                         image_bytes = part.get_payload(decode=True)
                         if part.get_filename():
                             filename = part.get_filename()
-                        break
+                    elif name in ('sightengine_user', 'sightengine_api_user'):
+                        val = part.get_payload(decode=True).decode('utf-8', errors='ignore').strip()
+                        if val:
+                            sightengine_user = val
+                    elif name in ('sightengine_secret', 'sightengine_api_secret'):
+                        val = part.get_payload(decode=True).decode('utf-8', errors='ignore').strip()
+                        if val:
+                            sightengine_secret = val
+                    elif name == 'llm_key':
+                        val = part.get_payload(decode=True).decode('utf-8', errors='ignore').strip()
+                        if val:
+                            llm_key = val
+                    elif name == 'llm_provider':
+                        val = part.get_payload(decode=True).decode('utf-8', errors='ignore').strip()
+                        if val:
+                            llm_provider = val
+                    elif name == 'llm_model':
+                        val = part.get_payload(decode=True).decode('utf-8', errors='ignore').strip()
+                        if val:
+                            llm_model = val
 
                 if not image_bytes:
                     self._send_json({'error': 'No image file found in form data'}, status=400)
@@ -65,7 +108,14 @@ class ForensicHTTPHandler(SimpleHTTPRequestHandler):
                     temp_file.write(image_bytes)
 
                 try:
-                    result = detector.analyze_image(temp_path)
+                    result = detector.analyze_image(
+                        image_path=temp_path,
+                        llm_api_key=llm_key,
+                        llm_provider=llm_provider,
+                        llm_model=llm_model,
+                        sightengine_user=sightengine_user,
+                        sightengine_secret=sightengine_secret
+                    )
                     self._send_json(result)
                 finally:
                     if os.path.exists(temp_path):
@@ -91,11 +141,29 @@ class ForensicHTTPHandler(SimpleHTTPRequestHandler):
 
 
 def run_server(port: int = 7860):
+    global detector
+    try:
+        from dotenv import load_dotenv
+        env_path = os.path.join(parent_dir, '.env')
+        if os.path.exists(env_path):
+            load_dotenv(dotenv_path=env_path, override=True)
+    except Exception:
+        pass
+
+    detector = DeepfakeDetector()
+    se_user = os.environ.get('SIGHTENGINE_API_USER')
+    se_secret = os.environ.get('SIGHTENGINE_API_SECRET')
+    has_se = bool(se_user and se_secret and se_user.strip() and se_secret.strip())
+
     server_address = ('127.0.0.1', port)
     httpd = HTTPServer(server_address, ForensicHTTPHandler)
     print(f"\n=======================================================")
     print(f" DeepTrace AI — Forensic Deepfake Detection Suite")
     print(f" Web UI Running at: http://127.0.0.1:{port}")
+    if has_se:
+        print(f" Primary AI Detector: Sightengine (models='genai,deepfake') [ACTIVE from .env]")
+    else:
+        print(f" Primary AI Detector: Local Smaug & Signal Forensics [Sightengine not in .env]")
     print(f"=======================================================\n")
     try:
         httpd.serve_forever()
